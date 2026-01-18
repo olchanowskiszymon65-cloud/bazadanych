@@ -9,6 +9,28 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Panel Magazynowy", layout="wide", page_icon="📦")
 
+# --- STYLIZACJA TŁA (Magazyn w tle) ---
+st.markdown("""
+    <style>
+    .stApp {
+        background-image: linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.85)), 
+        url("https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070");
+        background-attachment: fixed;
+        background-size: cover;
+    }
+    .stMetric {
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    [data-testid="stExpander"], [data-testid="stForm"], .st-emotion-cache-12w0u9p {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Pobieranie danych
 res_prod = supabase.table("produkty").select("*, kategorie(nazwa)").order("id").execute()
 df_prod = pd.DataFrame(res_prod.data)
@@ -16,72 +38,67 @@ res_kat = supabase.table("kategorie").select("*").execute()
 kat_list = res_kat.data
 
 # --- NAGŁÓWEK I STATYSTYKI ---
-st.title("📊 System Zarządzania Magazynem")
+st.title("🏭 Zarządzanie Zasobami Magazynu")
 
 if not df_prod.empty:
     m1, m2, m3 = st.columns(3)
-    m1.metric("Wszystkie Produkty", len(df_prod))
-    m2.metric("Suma Sztuk", int(df_prod['liczba'].sum()))
-    m3.metric("Wartość (PLN)", f"{sum(df_prod['liczba'] * df_prod['cena']):,.2f}")
+    m1.metric("📦 Pozycje", len(df_prod))
+    m2.metric("🔢 Łączna ilość", int(df_prod['liczba'].sum()))
+    m3.metric("💰 Wartość netto", f"{sum(df_prod['liczba'] * df_prod['cena']):,.2f} zł")
 
-    # Wykres w tle
-    st.subheader("Stan ilościowy produktów")
-    st.bar_chart(df_prod, x="nazwa", y="liczba", color="#0083B8")
+    st.subheader("📊 Stan zapasów")
+    st.bar_chart(df_prod, x="nazwa", y="liczba", color="#1f77b4")
 
-# --- PODZIAŁ NA ZAKŁADKI ---
-tab1, tab2 = st.tabs(["📦 Produkty", "📂 Kategorie"])
+# --- ZAKŁADKI ---
+tab1, tab2 = st.tabs(["📝 Ewidencja Produktów", "🗂️ Kategorie"])
 
-# --- ZAKŁADKA: PRODUKTY ---
+# --- TAB 1: PRODUKTY ---
 with tab1:
-    col_form, col_list = st.columns([1, 2])
+    col_f, col_l = st.columns([1, 2])
 
-    with col_form:
-        st.subheader("Dodaj Produkt")
-        kat_options = {k["nazwa"]: k["id"] for k in kat_list}
-        
-        with st.form("add_product", clear_on_submit=True):
-            n = st.text_input("Nazwa")
-            l = st.number_input("Ilość", min_value=0, step=1)
-            c = st.number_input("Cena", min_value=0.0, format="%.2f")
-            k = st.selectbox("Kategoria", options=list(kat_options.keys()))
-            
-            if st.form_submit_button("Dodaj do bazy") and n:
-                supabase.table("produkty").insert({
-                    "nazwa": n, "liczba": l, "cena": c, "kategoria_id": kat_options[k]
-                }).execute()
+    with col_f:
+        st.write("### ➕ Nowy Produkt")
+        k_opts = {k["nazwa"]: k["id"] for k in kat_list}
+        with st.form("p_form", clear_on_submit=True):
+            n = st.text_input("Nazwa towaru")
+            l = st.number_input("Ilość", min_value=0)
+            c = st.number_input("Cena jedn.", min_value=0.0)
+            k = st.selectbox("Wybierz kategorię", options=list(k_opts.keys()))
+            if st.form_submit_button("Dodaj do kartoteki") and n:
+                supabase.table("produkty").insert({"nazwa": n, "liczba": l, "cena": c, "kategoria_id": k_opts[k]}).execute()
                 st.rerun()
 
-    with col_list:
-        st.subheader("Lista Magazynowa")
+    with col_l:
+        st.write("### 📋 Aktualna Lista")
         if not df_prod.empty:
-            for _, row in df_prod.iterrows():
+            for _, r in df_prod.iterrows():
                 with st.container(border=True):
-                    c1, c2, c3 = st.columns([3, 1, 1])
-                    kat_n = row['kategorie']['nazwa'] if row.get('kategorie') else "Brak"
-                    c1.write(f"**{row['nazwa']}** ({kat_n})")
-                    c2.write(f"{row['liczba']} szt. / {row['cena']} zł")
-                    if c3.button("Usuń", key=f"p_{row['id']}"):
-                        supabase.table("produkty").delete().eq("id", row["id"]).execute()
+                    c1, c2, c3 = st.columns([3, 2, 1])
+                    kn = r['kategorie']['nazwa'] if r.get('kategorie') else "Niezdefiniowana"
+                    c1.write(f"**{r['nazwa']}**\n\n*{kn}*")
+                    c2.write(f"**{r['liczba']}** szt. | **{r['cena']}** zł")
+                    if c3.button("🗑️", key=f"del_{r['id']}"):
+                        supabase.table("produkty").delete().eq("id", r["id"]).execute()
                         st.rerun()
 
-# --- ZAKŁADKA: KATEGORIE ---
+# --- TAB 2: KATEGORIE ---
 with tab2:
-    st.subheader("Zarządzanie Kategoriami")
-    c_k1, c_k2 = st.columns([1, 2])
-
-    with c_k1:
-        with st.form("add_kat", clear_on_submit=True):
-            n_k = st.text_input("Nazwa nowej kategorii")
-            o_k = st.text_area("Opis")
-            if st.form_submit_button("Dodaj") and n_k:
-                supabase.table("kategorie").insert({"nazwa": n_k, "opis": o_k}).execute()
+    st.write("### 📂 Zarządzanie strukturą kategorii")
+    ck1, ck2 = st.columns([1, 2])
+    
+    with ck1:
+        with st.form("k_form"):
+            nk = st.text_input("Nowa kategoria")
+            if st.form_submit_button("Dodaj kategorię") and nk:
+                supabase.table("kategorie").insert({"nazwa": nk}).execute()
                 st.rerun()
 
-    with c_k2:
-        for kat in kat_list:
+    with ck2:
+        for kt in kat_list:
             with st.container(border=True):
-                ck1, ck2 = st.columns([4, 1])
-                ck1.write(f"**{kat['nazwa']}**")
-                if ck2.button("Usuń", key=f"k_{kat['id']}"):
-                    supabase.table("kategorie").delete().eq("id", kat["id"]).execute()
+                col1, col2 = st.columns([5, 1])
+                col1.write(f"📁 **{kt['nazwa']}**")
+                if col2.button("Usuń", key=f"kdel_{kt['id']}"):
+                    supabase.table("kategorie").delete().eq("id", kt["id"]).execute()
                     st.rerun()
+                   
