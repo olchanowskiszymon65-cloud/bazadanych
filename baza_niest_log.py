@@ -6,48 +6,66 @@ SUPABASE_URL = "https://rbyoztsgjuxcnwwneasu.supabase.co"
 SUPABASE_KEY = "sb_publishable_xlkem_D_yo3xIlTLRHsLMw_HpB0jEdS"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="Warehouse Pro", layout="wide", page_icon="📦")
+st.set_page_config(page_title="System Logistyczny PRO", layout="wide", page_icon="🚚")
 
-# --- DARK UI & CLEAR BACKGROUND (Wyraźne tło, ciemne panele) ---
+# --- ZAAWANSOWANA STYLIZACJA UI ---
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap');
+
     .stApp {
-        background-image: url("https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070");
+        background-image: url("https://images.unsplash.com/photo-1587293852726-70cdb56c2866?q=80&w=2072");
         background-attachment: fixed;
         background-size: cover;
     }
-    
-    /* Stylizacja nagłówków */
+
+    /* Ustawienia czcionek dla maksymalnej czytelności */
+    html, body, [class*="st-"] {
+        font-family: 'Roboto', sans-serif;
+    }
+
     h1, h2, h3 {
-        color: #ffffff !important;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        color: #FFFFFF !important;
+        text-shadow: 3px 3px 6px #000000 !important;
+        font-weight: 900 !important;
+        text-transform: uppercase;
     }
 
-    /* Przezroczyste, ciemne panele (Glassmorphism) */
+    /* Panele - Ciemne szkło */
     div[data-testid="stForm"], div[data-testid="stMetric"], .st-emotion-cache-12w0u9p, div[data-testid="stExpander"] {
-        background-color: rgba(30, 30, 30, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 15px !important;
-        backdrop-filter: blur(5px);
-        color: white !important;
+        background-color: rgba(0, 0, 0, 0.85) !important;
+        border: 2px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 20px !important;
+        padding: 20px !important;
+        backdrop-filter: blur(10px);
     }
 
-    /* Napisy wewnątrz paneli */
-    p, label, span {
-        color: #eeeeee !important;
+    /* Teksty w panelach */
+    p, label, span, .stMarkdown {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
     }
 
-    /* Stylizacja przycisków */
+    /* Przyciski */
     .stButton>button {
-        background-color: #2e7d32 !important;
+        background: linear-gradient(45deg, #FF4B4B, #FF8F8F) !important;
         color: white !important;
         border: none !important;
-        font-weight: bold !important;
+        border-radius: 10px !important;
+        font-weight: 900 !important;
+        transition: 0.3s;
     }
     
-    /* Tabela danych */
-    .stDataFrame {
-        background-color: rgba(255, 255, 255, 0.05);
+    .stButton>button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(255, 75, 75, 0.5);
+    }
+
+    /* Personalizacja metryk */
+    [data-testid="stMetricValue"] {
+        color: #00FF00 !important;
+        font-size: 2.5rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -62,65 +80,20 @@ except:
     produkty, kategorie = [], []
 
 # --- NAGŁÓWEK ---
-st.title("📦 System Logistyczny - Magazyn Główny")
-
-# --- STATYSTYKI ---
-if produkty:
-    t_qty = sum(i['liczba'] for i in produkty)
-    t_val = sum(i['liczba'] * i['cena'] for i in produkty)
-    
-    m1, m2, m3 = st.columns(3)
-    with m1: st.metric("📦 Pozycje", len(produkty))
-    with m2: st.metric("🔢 Łączna ilość", f"{t_qty} szt.")
-    with m3: st.metric("💰 Wartość zasobów", f"{t_val:,.2f} zł")
-
-    st.subheader("📊 Podgląd stanów towarowych")
-    c_data = {i['nazwa']: i['liczba'] for i in produkty}
-    st.bar_chart(c_data, color="#4CAF50")
-
-st.markdown("---")
+st.title("🚚 SYSTEM LOGISTYCZNY - CENTRUM OPERACYJNE")
 
 # --- ZAKŁADKI ---
-tab_mag, tab_kat = st.tabs(["🏗️ Zarządzaj Magazynem", "⚙️ Konfiguracja"])
+tab_dashboard, tab_magazyn, tab_dostawy, tab_kategorie, tab_raporty = st.tabs([
+    "📊 PULPIT ANALITYCZNY", 
+    "📦 STAN MAGAZYNU", 
+    "🚛 NOWA DOSTAWA", 
+    "🗂️ SEKCJE",
+    "📄 RAPORTY"
+])
 
-with tab_mag:
-    col_left, col_right = st.columns([1, 2])
-    
-    with col_left:
-        st.subheader("➕ Przyjmij towar")
-        k_map = {k['nazwa']: k['id'] for k in kategorie}
-        with st.form("new_p"):
-            name = st.text_input("Nazwa artykułu")
-            qty = st.number_input("Ilość", min_value=0)
-            price = st.number_input("Cena", min_value=0.0)
-            cat = st.selectbox("Kategoria", options=list(k_map.keys()))
-            if st.form_submit_button("DODAJ DO STANU"):
-                if name:
-                    supabase.table("produkty").insert({"nazwa": name, "liczba": qty, "cena": price, "kategoria_id": k_map[cat]}).execute()
-                    st.rerun()
-
-    with col_right:
-        st.subheader("📋 Inventaryzacja")
-        for p in produkty:
-            with st.container(border=True):
-                ca, cb, cc = st.columns([3, 2, 1])
-                k_label = p['kategorie']['nazwa'] if p.get('kategorie') else "Ogólna"
-                ca.write(f"### {p['nazwa']}\n*{k_label}*")
-                cb.write(f"**Stan:** {p['liczba']} szt.\n**Cena:** {p['cena']} zł")
-                if cc.button("Usuń", key=f"del_{p['id']}"):
-                    supabase.table("produkty").delete().eq("id", p["id"]).execute()
-                    st.rerun()
-
-with tab_kat:
-    st.subheader("Sekcje Magazynowe")
-    ck1, ck2 = st.columns([1, 2])
-    with ck1:
-        with st.form("new_k"):
-            n_k = st.text_input("Nazwa nowej sekcji")
-            if st.form_submit_button("Utwórz"):
-                if n_k:
-                    supabase.table("kategorie").insert({"nazwa": n_k}).execute()
-                    st.rerun()
-    with ck2:
-        for k in kategorie:
-            st.info(f"📂 Sekcja: {k['nazwa']}")
+# --- ZAKŁADKA: PULPIT (Wykresy) ---
+with tab_dashboard:
+    if produkty:
+        c1, c2, c3 = st.columns(3)
+        t_qty = sum(i['liczba'] for i in produkty)
+        t_val = sum(
